@@ -1,0 +1,104 @@
+name: Build Standards Page
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "A12G.csv"
+      - ".github/workflows/build-standards-page.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Convert CSV to HTML and Markdown
+        run: |
+          python3 << 'PY'
+          import csv
+          import html
+          from pathlib import Path
+
+          input_file = Path("A12G.csv")
+          html_file = Path("A12G-standards.html")
+          md_file = Path("A12G-standards.md")
+
+          with input_file.open("r", encoding="utf-8-sig", newline="") as f:
+              reader = csv.DictReader(f)
+              rows = list(reader)
+
+          with html_file.open("w", encoding="utf-8") as page:
+              page.write("""<!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Virginia 2023 Mathematics SOL Standards</title>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.5; max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+              .standard { border-bottom: 1px solid #ddd; padding: 18px 0; }
+              .field { margin: 6px 0; }
+              .label { font-weight: bold; }
+            </style>
+          </head>
+          <body>
+          <h1>Virginia 2023 Mathematics SOL Standards: Algebra 1, Geometry, Algebra 2</h1>
+          <p>This page contains visible standards text for lesson alignment review.</p>
+          """)
+
+              for i, row in enumerate(rows, start=1):
+                  code = ""
+                  for key, value in row.items():
+                      if key and value and "code" in key.lower():
+                          code = value.strip()
+                          break
+
+                  heading = code if code else f"Standard {i}"
+                  page.write(f'<div class="standard">\\n<h2>{html.escape(heading)}</h2>\\n')
+
+                  for key, value in row.items():
+                      if value and value.strip():
+                          page.write(
+                              f'<p class="field"><span class="label">{html.escape(key.strip())}:</span> '
+                              f'{html.escape(value.strip())}</p>\\n'
+                          )
+
+                  page.write("</div>\\n")
+
+              page.write("</body>\\n</html>")
+
+          with md_file.open("w", encoding="utf-8") as md:
+              md.write("# Virginia 2023 Mathematics SOL Standards: Algebra 1, Geometry, Algebra 2\\n\\n")
+              md.write("This page contains visible standards text for lesson alignment review.\\n\\n")
+
+              for i, row in enumerate(rows, start=1):
+                  code = ""
+                  for key, value in row.items():
+                      if key and value and "code" in key.lower():
+                          code = value.strip()
+                          break
+
+                  heading = code if code else f"Standard {i}"
+                  md.write(f"## {heading}\\n\\n")
+
+                  for key, value in row.items():
+                      if value and value.strip():
+                          md.write(f"**{key.strip()}:** {value.strip()}\\n\\n")
+
+                  md.write("---\\n\\n")
+
+          print("Created A12G-standards.html and A12G-standards.md")
+          PY
+
+      - name: Commit generated standards pages
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add A12G-standards.html A12G-standards.md
+          git commit -m "Build standards HTML and Markdown pages" || echo "No changes to commit"
+          git push
